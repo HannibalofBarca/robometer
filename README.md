@@ -26,8 +26,8 @@ Resulting weights: [Hannibal52Barca/robometer-4b-icl-finetuned](https://huggingf
 - **Ports:** eval servers moved off 8000 to 8020–8022.
 
 **Pipeline**
-1. `python dataset_upload/generate_hf_dataset.py --config dataset_upload/configs/data_gen_configs/icl_dataset.yaml`
-2. Preprocess with `robometer/configs/preprocess_icl_dataset.yaml` (set `cache_dir` first).
+1. `uv run python -m dataset_upload.generate_hf_dataset --config_path dataset_upload/configs/data_gen_configs/icl_dataset.yaml`
+2. `uv run python -m robometer.data.scripts.preprocess_datasets --config robometer/configs/preprocess_icl_dataset.yaml --cache_dir=$ROBOMETER_PROCESSED_DATASETS_PATH`
 3. Train with `train.py` as in [FINETUNE_ROBOMETER.md](FINETUNE_ROBOMETER.md), using the settings in
    `icl_finetune_train_config.yaml`.
 4. Run `run_finetuned_inference.py` / `run_finetuned_inference_online.py`.
