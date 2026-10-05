@@ -4,19 +4,11 @@ Fine-tuning and scoring of RoboMeter-4B on the ICL dataset, for
 [icvfe-evals](https://github.com/HannibalofBarca/icvfe-evals). Weights:
 [Hannibal52Barca/robometer-4b-icl-finetuned](https://huggingface.co/Hannibal52Barca/robometer-4b-icl-finetuned).
 
-- `dataset_upload/dataset_loaders/icl_loader.py`, `dataset_upload/configs/data_gen_configs/icl_dataset.yaml`: ICL dataset
-  loader (episode-level success/fail labels)
-- `dataset_upload/generate_hf_dataset.py`: hook for the ICL loader
-- `robometer/data/dataset_success_cutoff.txt`: `icl_dataset` cutoff (0.95)
-- `robometer/configs/preprocess_icl_dataset.yaml`: preprocessing config
-- `robometer/configs/icl_finetune_train_config.yaml`: training config used (LoRA from `robometer/Robometer-4B`)
-- `icl/demo_set_scoring/`: offline and online demo-set scoring, fine-tuned or `--zero-shot`
-- `run_finetuned_inference.py`, `run_finetuned_inference_online.py`: offline and online inference on ICL episodes
-- `icl/robometer_zeroshot/run_all_episodes.py`: LeRobot zero-shot pass over the full ICL dataset
-- `icl/reward_models_common/episode_cache.py`: shared frame-cache helper
-- `robometer/evals/eval_server.py`: forward `mm_token_type_ids` (required by newer `transformers` Qwen3-VL)
-- `robometer/data/samplers/eval/confusion_matrix.py`: lazy `sentence_transformers` import (torchao crash)
-- Eval server ports moved from 8000 to 8020–8022
+- **ICL dataset support:** loader and configs to fine-tune RoboMeter-4B with LoRA on the ICL dataset, using only
+  episode-level success/fail labels.
+- **Online scoring:** each frame is scored from past frames only, as in a live rollout, alongside upstream's offline
+  whole-episode scoring.
+- **Compatibility fixes** for newer `transformers` (Qwen3-VL) and `torchao`.
 
 ---
 
