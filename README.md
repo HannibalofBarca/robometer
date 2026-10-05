@@ -1,49 +1,22 @@
-# ICL fine-tuning (this fork)
+# Changes in this fork
 
-This branch adds a LoRA fine-tune of RoboMeter-4B on the ICL dataset
-([adityx23/icl-dataset](https://huggingface.co/datasets/adityx23/icl-dataset)), plus the offline and online
-scoring scripts used in the [icvfe-evals](https://github.com/HannibalofBarca/icvfe-evals) value-model comparison.
-Resulting weights: [Hannibal52Barca/robometer-4b-icl-finetuned](https://huggingface.co/Hannibal52Barca/robometer-4b-icl-finetuned).
+Fine-tuning and scoring of RoboMeter-4B on the ICL dataset, for
+[icvfe-evals](https://github.com/HannibalofBarca/icvfe-evals). Weights:
+[Hannibal52Barca/robometer-4b-icl-finetuned](https://huggingface.co/Hannibal52Barca/robometer-4b-icl-finetuned).
 
-**Changes from upstream**
-- **Data adapter:** `dataset_upload/dataset_loaders/icl_loader.py` (+ `dataset_upload/configs/data_gen_configs/icl_dataset.yaml`)
-  converts the ICL dataset into RoboMeter's format. Training uses only the episode-level success/fail labels,
-  which gives about 3,044 episodes after dropping `invalid`. Frames are 32 per episode at 3 fps. The output is
-  [adityx23/icl_rbm](https://huggingface.co/datasets/adityx23/icl_rbm). `icl_dataset` is added to
-  `dataset_success_cutoff.txt` (0.95).
-- **Preprocess / train configs:** `robometer/configs/preprocess_icl_dataset.yaml` and
-  `robometer/configs/icl_finetune_train_config.yaml` (the resolved config of the training run: LoRA from
-  `robometer/Robometer-4B`, vision encoder frozen, 150 steps, batch 4, lr 2e-5).
-- **Demo-set scoring** (`icl/demo_set_scoring/`): produces all four RoboMeter result sets in icvfe-evals.
-  - `batch_robometer_query.py` is offline: 32 frames spread over the full episode.
-  - `batch_robometer_query_online.py` is online: frame *t* is scored from frames 0..*t* only, as in
-    upstream's LIBERO reward wrapper.
-  - Both use the fine-tuned checkpoint by default, or `--zero-shot` for `robometer/Robometer-4B`.
-  - `build_continuous_annotations.py` packages the per-frame outputs into the `*_icl_demo_dataset_continuous`
-    archives.
-- **Other inference scripts:**
-  - `run_finetuned_inference.py` scores the 16 one-shot eval episodes. `run_finetuned_inference_online.py` is its
-    causal counterpart over ICL-dataset episodes.
-  - `icl/robometer_zeroshot/run_all_episodes.py` is a LeRobot (`lerobot/Robometer-4B`) zero-shot pass over the
-    full ICL dataset. It is not used in icvfe-evals.
-- **Fixes:**
-  - `eval_server.py` forwards `mm_token_type_ids`, which newer `transformers` Qwen3-VL requires.
-  - `confusion_matrix.py` imports `sentence_transformers` lazily, avoiding a torchao import crash.
-- **Ports:** eval servers moved off 8000 to 8020–8022.
-
-**Pipeline**
-1. `uv run python -m dataset_upload.generate_hf_dataset --config_path dataset_upload/configs/data_gen_configs/icl_dataset.yaml`
-2. `uv run python -m robometer.data.scripts.preprocess_datasets --config robometer/configs/preprocess_icl_dataset.yaml --cache_dir=$ROBOMETER_PROCESSED_DATASETS_PATH`
-3. Train with `train.py` as in [FINETUNE_ROBOMETER.md](FINETUNE_ROBOMETER.md), using the settings in
-   `icl_finetune_train_config.yaml`.
-4. Score the demo set with `batch_robometer_query.py` / `batch_robometer_query_online.py` (add `--zero-shot` for the
-   base model), then package with `build_continuous_annotations.py`.
-
-**Layout:** the ICL scripts expect this repo to be checked out as `robometer_train/` inside an
-`icl_annotations/` directory that also holds:
-- `reward_models_common/episode_cache.py` (copy from `icl/`)
-- `reward_guided_retrieval/` (copy `icl/demo_set_scoring/*`)
-- Robo-Dopamine's extracted frame cache at `Robo-Dopamine/episode_cache/`, which holds every 10th frame, all 3 cameras.
+- `dataset_upload/dataset_loaders/icl_loader.py`, `dataset_upload/configs/data_gen_configs/icl_dataset.yaml`: ICL dataset
+  loader (episode-level success/fail labels)
+- `dataset_upload/generate_hf_dataset.py`: hook for the ICL loader
+- `robometer/data/dataset_success_cutoff.txt`: `icl_dataset` cutoff (0.95)
+- `robometer/configs/preprocess_icl_dataset.yaml`: preprocessing config
+- `robometer/configs/icl_finetune_train_config.yaml`: training config used (LoRA from `robometer/Robometer-4B`)
+- `icl/demo_set_scoring/`: offline and online demo-set scoring, fine-tuned or `--zero-shot`
+- `run_finetuned_inference.py`, `run_finetuned_inference_online.py`: offline and online inference on ICL episodes
+- `icl/robometer_zeroshot/run_all_episodes.py`: LeRobot zero-shot pass over the full ICL dataset
+- `icl/reward_models_common/episode_cache.py`: shared frame-cache helper
+- `robometer/evals/eval_server.py`: forward `mm_token_type_ids` (required by newer `transformers` Qwen3-VL)
+- `robometer/data/samplers/eval/confusion_matrix.py`: lazy `sentence_transformers` import (torchao crash)
+- Eval server ports moved from 8000 to 8020–8022
 
 ---
 
