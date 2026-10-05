@@ -1,3 +1,43 @@
+# ICL fine-tuning (this fork)
+
+This branch adds a LoRA fine-tune of RoboMeter-4B on the ICL dataset
+([adityx23/icl-dataset](https://huggingface.co/datasets/adityx23/icl-dataset)), plus offline and online
+inference scripts used in the [icvfe-evals](https://github.com/HannibalofBarca/icvfe-evals) value-model comparison.
+Resulting weights: [Hannibal52Barca/robometer-4b-icl-finetuned](https://huggingface.co/Hannibal52Barca/robometer-4b-icl-finetuned).
+
+**Changes from upstream**
+- **Data adapter:** `dataset_upload/dataset_loaders/icl_loader.py` (+ `dataset_upload/configs/data_gen_configs/icl_dataset.yaml`)
+  converts the ICL dataset into RoboMeter's format. Training uses only the episode-level success/fail labels,
+  which gives about 3,044 episodes after dropping `invalid`. Frames are 32 per episode at 3 fps. The output is
+  [adityx23/icl_rbm](https://huggingface.co/datasets/adityx23/icl_rbm). `icl_dataset` is added to
+  `dataset_success_cutoff.txt` (0.95).
+- **Preprocess / train configs:** `robometer/configs/preprocess_icl_dataset.yaml` and
+  `robometer/configs/icl_finetune_train_config.yaml` (the resolved config of the training run: LoRA from
+  `robometer/Robometer-4B`, vision encoder frozen, 150 steps, batch 4, lr 2e-5).
+- **Inference:**
+  - `run_finetuned_inference.py` is offline: 32 frames spread over the full episode, one pass.
+  - `run_finetuned_inference_online.py` is online: frame *t* is scored from frames 0..*t* only, as in
+    upstream's LIBERO reward wrapper.
+  - `icl/robometer_zeroshot/run_all_episodes.py` produces the zero-shot baseline, using LeRobot's
+    `lerobot.rewards.robometer` with `lerobot/Robometer-4B`.
+- **Fixes:**
+  - `eval_server.py` forwards `mm_token_type_ids`, which newer `transformers` Qwen3-VL requires.
+  - `confusion_matrix.py` imports `sentence_transformers` lazily, avoiding a torchao import crash.
+- **Ports:** eval servers moved off 8000 to 8020–8022.
+
+**Pipeline**
+1. `python dataset_upload/generate_hf_dataset.py --config dataset_upload/configs/data_gen_configs/icl_dataset.yaml`
+2. Preprocess with `robometer/configs/preprocess_icl_dataset.yaml` (set `cache_dir` first).
+3. Train with `train.py` as in [FINETUNE_ROBOMETER.md](FINETUNE_ROBOMETER.md), using the settings in
+   `icl_finetune_train_config.yaml`.
+4. Run `run_finetuned_inference.py` / `run_finetuned_inference_online.py`.
+
+**Layout:** the ICL scripts expect this repo to be checked out next to an `icl_annotations` directory holding
+`reward_models_common/episode_cache.py` (copy from `icl/`) and Robo-Dopamine's extracted frame cache at
+`Robo-Dopamine/episode_cache/`. That cache holds every 10th frame, all 3 cameras.
+
+---
+
 # Robometer: Scaling General-Purpose Robotic Reward Models via Trajectory Comparisons
 
 [![arXiv](https://img.shields.io/badge/arXiv-2603.02115-b31b1b.svg)](https://arxiv.org/abs/2603.02115)
@@ -83,7 +123,7 @@ Start the eval server on your machine, then call it with a video and task:
 ```bash
 uv run python robometer/evals/eval_server.py \
   server_url=0.0.0.0 \
-  server_port=8000
+  server_port=8020
 ```
 
 Then run the client (no robometer dependency):
@@ -91,21 +131,21 @@ Then run the client (no robometer dependency):
 ```bash
 # SOAR
 uv run python scripts/example_inference.py \
-  --eval-server-url http://localhost:8000 \
+  --eval-server-url http://localhost:8020 \
   --video scripts/example_videos/soar_put_green_stick_in_brown_bowl.mp4 \
   --task "Put green stick in brown bowl" \
   --fps 3
 
 # Berkeley RPT (Wrist)
 uv run python scripts/example_inference.py \
-  --eval-server-url http://localhost:8000 \
+  --eval-server-url http://localhost:8020 \
   --video scripts/example_videos/berkeley_rpt_stack_cup.mp4 \
   --task "Pick up the yellow cup and stack it on the other cup" \
   --fps 3
 
 # Your own video
 uv run python scripts/example_inference.py \
-  --eval-server-url http://localhost:8000 \
+  --eval-server-url http://localhost:8020 \
   --video /path/to/video.mp4 \
   --task "your task description"
 ```
